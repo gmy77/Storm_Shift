@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STORM-SHIFT // METAGRAMMA</title>
+<style>
+:root{--bg:#f3f5f2;--panel:#fff;--phos:#163b28;--amber:#9b5b00;--dim:#aab7ae;--muted:#52625a}
+*{box-sizing:border-box} html,body{margin:0;min-height:100%;background:var(--bg);color:var(--phos);font-family:"Courier New",ui-monospace,monospace}
+header{padding:10px 16px;border-bottom:1px solid var(--dim);display:flex;justify-content:space-between;gap:16px;align-items:center;background:#fff}
+h1{margin:0;font-size:15px;letter-spacing:2px} h1 b{color:var(--amber)} .meta{font-size:10px;color:var(--muted);text-align:right;line-height:1.4}
+main{max-width:1420px;margin:auto;padding:12px 16px 20px}.toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px}
+button,select{background:#fff;color:var(--phos);border:1px solid var(--dim);font:inherit;font-size:11px;letter-spacing:1px;padding:5px 9px;cursor:pointer}
+button:hover,select:hover{border-color:var(--phos);box-shadow:0 0 7px rgba(22,59,40,.18)} select{color:var(--phos)}
+.status{font-size:11px;color:var(--muted);margin-left:auto}.frame{border:1px solid var(--dim);background:var(--panel);overflow:auto}
+canvas{display:block;width:100%;min-width:900px;height:auto}.legend{display:flex;gap:14px;flex-wrap:wrap;padding:8px 10px;border-top:1px solid var(--dim);font-size:10px;color:#263a2e}
+.sw{display:inline-block;width:10px;height:3px;margin-right:4px;vertical-align:middle}.note{color:var(--muted);font-size:10px;line-height:1.45;margin:10px 0 0}
+@media(max-width:650px){header{align-items:flex-start}h1{font-size:12px}.meta{display:none}main{padding:9px}.status{width:100%;margin:0}.frame{margin-right:-9px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>STORM-SHIFT <b>▓</b> METAGRAMMA FVG</h1>
+  <div class="meta" id="meta">CARICAMENTO…<br>ICON seamless · Open-Meteo<br>StormShift v1.1.4</div>
+</header>
+<main>
+  <div class="toolbar">
+    <button id="back">← DASHBOARD</button>
+    <label for="city">LOCALITÀ</label><select id="city"></select>
+    <button id="refresh">↻ AGGIORNA</button>
+    <span class="status" id="status">Preparazione della previsione…</span>
+  </div>
+  <div class="frame"><canvas id="chart" width="1320" height="860" aria-label="Metagramma meteorologico"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:#ff4b4b"></i>temperatura 2 m</span>
+      <span><i class="sw" style="background:#5ac8fa"></i>punto di rugiada</span>
+      <span><i class="sw" style="background:#bc68ff"></i>CAPE</span>
+      <span><i class="sw" style="background:#ffb000"></i>raffiche</span>
+      <span><i class="sw" style="background:#33d17a"></i>umidità</span>
+      <span><i class="sw" style="background:#32b7ff"></i>precipitazione</span>
+    </div>
+  </div>
+  <p class="note">Metagramma previsionale: ogni colonna rappresenta un’ora. Il profilo del vento usa i livelli 10 m, 850, 700 e 500 hPa disponibili dal modello; non sostituisce le allerte ufficiali.</p>
+</main>
+<script>
+const APP_VERSION="1.1.4";
+const PLACES=[
+  ["Rodeano Basso",46.130,13.020],["Udine",46.070,13.230],["Trieste",45.650,13.770],
+  ["Pordenone",45.960,12.660],["Gorizia",45.940,13.620],["Tolmezzo",46.400,13.020]
+];
+const FIELDS=[
+  "temperature_2m","relative_humidity_2m","dew_point_2m","surface_pressure","precipitation",
+  "cloud_cover","cape","convective_inhibition","wind_speed_10m","wind_direction_10m",
+  "wind_speed_850hPa","wind_direction_850hPa","wind_speed_700hPa","wind_direction_700hPa",
+  "wind_speed_500hPa","wind_direction_500hPa","wind_gusts_10m"
+];
+const canvas=document.getElementById("chart"),ctx=canvas.getContext("2d"),cityEl=document.getElementById("city");
+let hourly=null,selectedPlace=PLACES[0];
+const params=new URLSearchParams(window.location.search);
+const requestedLat=Number(params.get("lat")),requestedLon=Number(params.get("lon"));
+if(params.has("lat")&&params.has("lon")&&Number.isFinite(requestedLat)&&Number.isFinite(requestedLon)){
+  selectedPlace=[params.get("name")||"Località selezionata",requestedLat,requestedLon];
+  const existingPlace=PLACES.findIndex(([,lat,lon])=>
+    Math.abs(lat-requestedLat)<.001&&Math.abs(lon-requestedLon)<.001);
+  if(existingPlace>=0){
+    selectedPlace=PLACES[existingPlace];
+    PLACES.splice(existingPlace,1);
+  }
+  PLACES.unshift(selectedPlace);
+}
+PLACES.forEach((place,index)=>{
+  const option=document.createElement("option");option.value=index;option.textContent=place[0];cityEl.append(option);
+});
+cityEl.value="0";
+document.getElementById("back").addEventListener("click",()=>{window.location.href="/";});
+cityEl.addEventListener("change",()=>{selectedPlace=PLACES[Number(cityEl.value)];load();});
+document.getElementById("refresh").addEventListener("click",load);
+
+function timeLabel(time){return `${time.slice(8,10)}/${time.slice(5,7)} ${time.slice(11,16)}`;}
+function value(field,index){const n=hourly[field]?.[index];return Number.isFinite(n)?n:null;}
+function range(values,minPadding=0,maxPadding=0){
+  const valid=values.filter(Number.isFinite);let min=Math.min(...valid),max=Math.max(...valid);
+  if(min===max){min-=1;max+=1;} return [min-minPadding,max+maxPadding];
+}
+function drawText(text,x,y,color="#405248",align="left",font="10px monospace"){
+  ctx.fillStyle=color;ctx.font=font;ctx.textAlign=align;ctx.fillText(text,x,y);
+}
+function line(points,color,width=1.5){
+  ctx.beginPath();points.forEach(([x,y],index)=>index?ctx.lineTo(x,y):ctx.moveTo(x,y));
+  ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();
+}
+function panel(y,height,title,unit){
+  ctx.fillStyle="#fbfcfa";ctx.fillRect(0,y,canvas.width,height);
+  ctx.strokeStyle="#9aa99f";ctx.lineWidth=1;ctx.strokeRect(0.5,y+.5,canvas.width-1,height-1);
+  drawText(title,12,y+15,"#9b5b00","left","bold 10px monospace");
+  if(unit)drawText(unit,12,y+28,"#52625a");
+}
+function grid(left,right,y,height,count){
+  ctx.setLineDash([3,3]);ctx.strokeStyle="rgba(82,98,90,.35)";ctx.lineWidth=1;
+  for(let row=1;row<count;row++){const py=y+height*row/count;ctx.beginPath();ctx.moveTo(left,py);ctx.lineTo(right,py);ctx.stroke();}
+  ctx.setLineDash([]);
+}
+function xFor(i,count,left,right){return left+(right-left)*i/Math.max(1,count-1);}
+function scale(n,min,max,y,height){return y+height-(n-min)/(max-min)*height;}
+function drawAxes(times,left,right){
+  ctx.strokeStyle="rgba(82,98,90,.35)";ctx.setLineDash([3,4]);ctx.lineWidth=1;
+  times.forEach((time,index)=>{
+    if(index%6)return;const x=xFor(index,times.length,left,right);
+    ctx.beginPath();ctx.moveTo(x,34);ctx.lineTo(x,835);ctx.stroke();
+    drawText(timeLabel(time),x,30,index%24===0?"#9b5b00":"#52625a","center");
+  });ctx.setLineDash([]);
+}
+function drawWind(times,left,right,y,height){
+  panel(y,height,"VENTO / PROFILO","km/h · quota");
+  const levels=[
+    ["10 m","wind_speed_10m","wind_direction_10m","#ff4b4b"],
+    ["850 hPa","wind_speed_850hPa","wind_direction_850hPa","#ffb000"],
+    ["700 hPa","wind_speed_700hPa","wind_direction_700hPa","#a87900"],
+    ["500 hPa","wind_speed_500hPa","wind_direction_500hPa","#188a4b"]
+  ];
+  levels.forEach(([label,speed,direction,color],row)=>{
+    const py=y+43+row*43;drawText(label,left-10,py+3,color,"right");
+    ctx.strokeStyle="rgba(82,98,90,.24)";ctx.beginPath();ctx.moveTo(left,py);ctx.lineTo(right,py);ctx.stroke();
+    times.forEach((_,index)=>{
+      if(index%2)return;const spd=value(speed,index)||0,deg=value(direction,index)||0,x=xFor(index,times.length,left,right);
+      const length=6+Math.min(16,spd/5),r=(deg+180)*Math.PI/180;
+      ctx.strokeStyle=color;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,py);ctx.lineTo(x+Math.sin(r)*length,py-Math.cos(r)*length);ctx.stroke();
+      ctx.fillStyle=color;ctx.fillRect(x-1,py-1,2,2);
+    });
+  });
+}
+function drawPressure(times,left,right,y,height){
+  panel(y,height,"PRESSIONE AL SUOLO","hPa");grid(left,right,y,height,3);
+  const values=times.map((_,i)=>value("surface_pressure",i)),[min,max]=range(values,.8,.8);
+  line(values.map((v,i)=>[xFor(i,times.length,left,right),scale(v,min,max,y+18,height-25)]),"#4d7cff",1.8);
+  drawText(`${max.toFixed(0)} hPa`,left-10,y+25,"#4d7cff","right");drawText(`${min.toFixed(0)} hPa`,left-10,y+height-6,"#4d7cff","right");
+}
+function drawInstability(times,left,right,y,height){
+  panel(y,height,"INSTABILITÀ CONVETTIVA","CAPE J/kg · CIN J/kg");grid(left,right,y,height,3);
+  const capes=times.map((_,i)=>value("cape",i)||0),max=Math.max(500,Math.ceil(Math.max(...capes)/500)*500);
+  capes.forEach((cape,i)=>{const x=xFor(i,times.length,left,right),next=xFor(Math.min(i+1,times.length-1),times.length,left,right);
+    ctx.fillStyle="rgba(188,104,255,.75)";ctx.fillRect(x+1,scale(cape,0,max,y+18,height-25),Math.max(1,next-x-2),y+height-7-scale(cape,0,max,y+18,height-25));});
+  const cin=times.map((_,i)=>value("convective_inhibition",i)||0),cinMax=Math.max(50,...cin);
+  line(cin.map((n,i)=>[xFor(i,times.length,left,right),y+height-7-n/cinMax*(height-25)]),"#ff5858",1.3);
+  drawText(max.toFixed(0),left-10,y+25,"#bc68ff","right");drawText("0",left-10,y+height-6,"#bc68ff","right");
+}
+function drawTemperature(times,left,right,y,height){
+  panel(y,height,"TEMPERATURA / PUNTO DI RUGIADA","°C");grid(left,right,y,height,4);
+  const temp=times.map((_,i)=>value("temperature_2m",i)),dew=times.map((_,i)=>value("dew_point_2m",i)),[min,max]=range([...temp,...dew],2,2);
+  line(temp.map((n,i)=>[xFor(i,times.length,left,right),scale(n,min,max,y+18,height-25)]),"#ff4b4b",2);
+  line(dew.map((n,i)=>[xFor(i,times.length,left,right),scale(n,min,max,y+18,height-25)]),"#5ac8fa",1.7);
+  drawText(`${max.toFixed(0)}°`,left-10,y+25,"#ff4b4b","right");drawText(`${min.toFixed(0)}°`,left-10,y+height-6,"#5ac8fa","right");
+}
+function drawHumidityCloud(times,left,right,y,height){
+  panel(y,height,"UMIDITÀ RELATIVA / NUVOLOSITÀ","%");grid(left,right,y,height,4);
+  const humidity=times.map((_,i)=>value("relative_humidity_2m",i)||0),cloud=times.map((_,i)=>value("cloud_cover",i)||0);
+  cloud.forEach((n,i)=>{const x=xFor(i,times.length,left,right),next=xFor(Math.min(i+1,times.length-1),times.length,left,right);
+    ctx.fillStyle=`rgba(205,220,215,${.08+n/180})`;ctx.fillRect(x,y+18,Math.max(1,next-x+1),height-25);});
+  line(humidity.map((n,i)=>[xFor(i,times.length,left,right),scale(n,0,100,y+18,height-25)]),"#33d17a",1.8);
+  drawText("100",left-10,y+25,"#33d17a","right");drawText("0",left-10,y+height-6,"#33d17a","right");
+}
+function drawPrecipitation(times,left,right,y,height){
+  panel(y,height,"PRECIPITAZIONE / RAFFICHE AL SUOLO","mm/h · km/h");grid(left,right,y,height,3);
+  const rain=times.map((_,i)=>value("precipitation",i)||0),gust=times.map((_,i)=>value("wind_gusts_10m",i)||0);
+  const rainMax=Math.max(1,Math.ceil(Math.max(...rain))),gustMax=Math.max(30,Math.ceil(Math.max(...gust)/10)*10);
+  rain.forEach((n,i)=>{const x=xFor(i,times.length,left,right),next=xFor(Math.min(i+1,times.length-1),times.length,left,right);
+    ctx.fillStyle="#32b7ff";ctx.fillRect(x+1,scale(n,0,rainMax,y+18,height-25),Math.max(1,next-x-2),y+height-7-scale(n,0,rainMax,y+18,height-25));});
+  line(gust.map((n,i)=>[xFor(i,times.length,left,right),scale(n,0,gustMax,y+18,height-25)]),"#ffb000",1.5);
+  drawText(`${rainMax} mm`,left-10,y+25,"#32b7ff","right");drawText(`${gustMax} km/h`,right+8,y+25,"#ffb000");
+}
+function render(){
+  if(!hourly)return;const times=hourly.time,left=105,right=canvas.width-32;
+  ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawText(`METAGRAMMA ICON SEAMLESS · ${selectedPlace[0].toUpperCase()} · ${times.length} ORE`,12,17,"#163b28","left","bold 12px monospace");
+  drawAxes(times,left,right);drawWind(times,left,right,42,205);drawPressure(times,left,right,255,76);
+  drawInstability(times,left,right,339,100);drawTemperature(times,left,right,447,100);
+  drawHumidityCloud(times,left,right,555,100);drawPrecipitation(times,left,right,663,100);
+  drawText("TEMPO LOCALE (EUROPE/ROME)",(left+right)/2,790,"#52625a","center");
+}
+async function load(){
+  const status=document.getElementById("status"),refresh=document.getElementById("refresh");
+  refresh.disabled=true;status.textContent="Download previsione ICON…";
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${selectedPlace[1]}&longitude=${selectedPlace[2]}&hourly=${FIELDS.join(",")}&models=icon_seamless&timezone=Europe%2FRome&forecast_days=3`;
+  try{
+    const response=await fetch(url,{cache:"no-store"});if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();if(!data.hourly?.time)throw new Error("Dati orari mancanti");
+    hourly=data.hourly;render();status.textContent=`${selectedPlace[0]} · aggiornato ${new Date().toLocaleTimeString("it-IT")}`;
+    document.getElementById("meta").innerHTML=`LIVE · ICON seamless · Open-Meteo<br>${selectedPlace[0]} · ${data.latitude.toFixed(2)}N ${data.longitude.toFixed(2)}E<br>StormShift v${APP_VERSION}`;
+  }catch(error){status.textContent="Previsione non disponibile: riprova l’aggiornamento.";console.error(error);}
+  finally{refresh.disabled=false;}
+}
+load();
+</script>
+</body>
+</html>

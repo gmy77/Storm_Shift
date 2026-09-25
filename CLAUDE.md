@@ -96,24 +96,27 @@ Non sveglia il container.
 - Worker: `npx wrangler deploy --dry-run --containers-rollout=none` controlla
   bundle e binding senza costruire l'immagine.
 
-## ⚠️ Prima del primo deploy da questo repo: recuperare gli asset di produzione
-Il Worker in produzione (deploy del 2026-09-06) serve file statici che qui NON
-ci sono. Di sicuro `metagram.html`, la pagina del pulsante METAGRAMMA, che
-secondo Gimmy funzionava. Forse anche una dashboard più nuova di quella dello
-zip. `wrangler deploy` sostituisce TUTTI gli asset con il contenuto di
-`public/`, quindi quei file sparirebbero.
+## Asset di produzione recuperati (2026-09-25)
+Il Worker deployato il 06/09 serviva file statici che non erano nello zip.
+Gimmy li ha scaricati dalla produzione e sono stati confrontati:
+- `public/metagram.html`: copia esatta di quello in produzione (etichetta
+  v1.1.4). È una pagina autonoma che scarica i dati solo da Open-Meteo, senza
+  altri file locali. La apre il pulsante METAGRAMMA della dashboard.
+- **Dashboard**: in produzione c'era la **1.1.4**, qui c'è la **1.1.5**, più
+  nuova: pulsante METAGRAMMA, ◀1H/1H▶, nuovi tentativi con timeout su
+  Open-Meteo, aggiornamento ogni 30 minuti. Il primo deploy porta quindi in
+  produzione la 1.1.5.
+- **Soglia L1 "solo CAPE"**: `CAPE ≥ 800` nella 1.1.4, `CAPE ≥ 1500` nella
+  1.1.5. È rimasta quella della 1.1.5; se si vuole l'altra, lo decide Gimmy.
+- La 1.1.4 in produzione aveva un CSS per il testo "⚠ PICCO" nel footer
+  (larghezza fissa di 260px con "…"). **Non è stato riportato**: provato nel
+  browser, con i pulsanti in più della 1.1.5 fa uscire il footer di 67px a
+  1280px di larghezza, mentre la 1.1.5 senza quel CSS ci sta. A 1440 e 1920px
+  le due versioni sono identiche.
 
-Prima del deploy vanno scaricati da produzione, dal PC, perché dal cloud
-l'indirizzo è bloccato:
-- `https://stormshift.gimmy077.workers.dev/metagram.html` va messo in
-  `public/metagram.html`;
-- `https://stormshift.gimmy077.workers.dev/` va confrontato con
-  `public/index.html`.
-
-Poi va controllato che il metagramma non carichi altri file locali. Se non si
-riesce a recuperarli, il Worker vecchio si può sempre ripristinare da
-Cloudflare (Workers > stormshift > Deployments > Rollback).
+Gli unici file statici noti della produzione erano `/` e `/metagram.html`. Se
+dopo il deploy manca qualcos'altro, si torna al Worker vecchio da Cloudflare
+(Workers > stormshift > Deployments > Rollback).
 
 ## Mancano nel repo (erano citati nel README ma non erano nello zip)
-`public/metagram.html` (la dashboard ci manda con un link: senza, 404),
 `stormshift_forecast.py`, `calibra_1..4_*.py` e `LICENSE`. Vanno aggiunti dal PC.
