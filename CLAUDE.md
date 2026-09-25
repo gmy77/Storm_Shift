@@ -96,6 +96,24 @@ Non sveglia il container.
 - Worker: `npx wrangler deploy --dry-run --containers-rollout=none` controlla
   bundle e binding senza costruire l'immagine.
 
+## ⚠️ Prima del primo deploy da questo repo: recuperare gli asset di produzione
+Il Worker in produzione (deploy del 2026-09-06) serve file statici che qui NON
+ci sono. Di sicuro `metagram.html`, la pagina del pulsante METAGRAMMA, che
+secondo Gimmy funzionava. Forse anche una dashboard più nuova di quella dello
+zip. `wrangler deploy` sostituisce TUTTI gli asset con il contenuto di
+`public/`, quindi quei file sparirebbero.
+
+Prima del deploy vanno scaricati da produzione, dal PC, perché dal cloud
+l'indirizzo è bloccato:
+- `https://stormshift.gimmy077.workers.dev/metagram.html` va messo in
+  `public/metagram.html`;
+- `https://stormshift.gimmy077.workers.dev/` va confrontato con
+  `public/index.html`.
+
+Poi va controllato che il metagramma non carichi altri file locali. Se non si
+riesce a recuperarli, il Worker vecchio si può sempre ripristinare da
+Cloudflare (Workers > stormshift > Deployments > Rollback).
+
 ## Mancano nel repo (erano citati nel README ma non erano nello zip)
 `public/metagram.html` (la dashboard ci manda con un link: senza, 404),
 `stormshift_forecast.py`, `calibra_1..4_*.py` e `LICENSE`. Vanno aggiunti dal PC.
