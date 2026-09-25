@@ -41,7 +41,8 @@ STORM-SHIFT
 ├── Bridge radar        stormshift_meteohub_server.py   (FastAPI, porta 8765)
 │   └── credenziali     stormshift_meteohub_secrets.py  (Windows Credential Manager)
 ├── Avvio               Start-StormShift.ps1            (server + Cloudflare Tunnel)
-├── Frontend            stormshift_radar.html           (dashboard "sala radar")
+├── Frontend            public/index.html               (dashboard "sala radar")
+├── Cloudflare          src/index.js, wrangler.jsonc, Dockerfile  (Worker + Container)
 ├── Motore forecast     stormshift_forecast.py          (AIFS → ICON-2I, Open-Meteo)
 └── Calibrazione
     ├── calibra_1_download_era5.py   scarica ERA5 (CAPE, CIN, T850/T500) dal CDS
@@ -93,7 +94,18 @@ pip install -r requirements.txt
   key: <IL-TUO-PERSONAL-ACCESS-TOKEN>
   ```
 
-### Avvio
+### Avvio su Cloudflare (Worker + Container, senza PC acceso)
+
+Serve Docker acceso sul PC da cui si fa il deploy (wrangler costruisce l'immagine del container):
+
+```powershell
+npm ci
+npx wrangler secret put METEOHUB_EMAIL            # solo la prima volta
+npx wrangler secret put METEOHUB_ARCO_ACCESS_KEY  # solo la prima volta
+npx wrangler deploy
+```
+
+### Avvio sul PC (bridge locale + Cloudflare Tunnel)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File Start-StormShift.ps1 -OpenBrowser

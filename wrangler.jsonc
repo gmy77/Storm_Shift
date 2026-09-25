@@ -1,0 +1,31 @@
+// StormShift su Cloudflare: Worker (dashboard statica + instradamento /api/)
+// e Container con il bridge radar METEOHUB.
+// Deploy dal PC con "npx wrangler deploy": serve Docker acceso, perche'
+// wrangler costruisce l'immagine del container in locale.
+// Segreti (una volta sola, NON in questo file):
+//   npx wrangler secret put METEOHUB_EMAIL
+//   npx wrangler secret put METEOHUB_ARCO_ACCESS_KEY
+{
+  "name": "stormshift",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "containers": [
+    // instance_type non indicato = quello predefinito di Cloudflare. Il deploy
+    // del 06/09 poteva averne uno diverso: controllarlo nella dashboard
+    // (Workers > stormshift > Containers) prima del primo deploy da qui.
+    { "class_name": "StormShiftRadar", "image": "./Dockerfile", "max_instances": 1 }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "RADAR", "class_name": "StormShiftRadar" }]
+  },
+  // Il tag deve coincidere con quello gia' applicato dal deploy del 06/09,
+  // altrimenti wrangler prova a ricreare la classe e il deploy si ferma con un
+  // errore (senza danni): in quel caso va messo il tag che indica l'errore.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StormShiftRadar"] }],
+  // Solo diagnostica: stessa tabella "diagnostica" di sismo-fvg.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "terremoti-fvg", "database_id": "6504ff40-54b2-4a79-8860-99c9279da534" }
+  ],
+  "observability": { "enabled": true }
+}

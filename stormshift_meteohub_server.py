@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import base64
+import os
+import sys
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -16,12 +18,12 @@ import xarray as xr
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
-from stormshift_meteohub_secrets import get_arco_credentials
-
 
 BASE_DIR = Path(__file__).resolve().parent
-DASHBOARD_FILE = BASE_DIR / "stormshift_radar.html"
-METAGRAM_FILE = BASE_DIR / "metagram.html"
+# La dashboard sta in public/: la stessa cartella che il Worker Cloudflare
+# serve come asset statici, cosi' il file e' uno solo per le due versioni.
+DASHBOARD_FILE = BASE_DIR / "public" / "index.html"
+METAGRAM_FILE = BASE_DIR / "public" / "metagram.html"
 ARCO_RADAR_URL = "https://meteohub.agenziaitaliameteo.it/api/arco/radar.zarr"
 FVG_BOUNDS = {"lat_min": 45.55, "lat_max": 46.70, "lon_min": 12.30, "lon_max": 13.95}
 MAX_AGE_SECONDS = 300
@@ -40,7 +42,10 @@ _request_log: dict[str, deque[float]] = defaultdict(deque)
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Limita le richieste per IP per proteggere le credenziali ARCO da abusi."""
-    client_ip = request.client.host if request.client else "unknown"
+    # Dietro Cloudflare (Tunnel o Worker) request.client e' sempre lo stesso
+    # proxy: l'IP vero del visitatore arriva in CF-Connecting-IP. Senza, il
+    # limite diventava uno solo per tutti i visitatori insieme.
+    client_ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "unknown")
     now = monotonic()
     log = _request_log[client_ip]
     while log and now - log[0] > RATE_LIMIT_WINDOW_SECONDS:
@@ -62,6 +67,28 @@ def reset_dataset_cache_on_repeated_failure() -> None:
 
 def mark_dataset_healthy() -> None:
     _dataset_failures["count"] = 0
+
+
+def get_arco_credentials() -> tuple[str, str]:
+    """Credenziali ARCO: prima le variabili d'ambiente, poi il vault Windows.
+
+    Nel Container Cloudflare le passa il Worker dai suoi segreti
+    (METEOHUB_EMAIL, METEOHUB_ARCO_ACCESS_KEY). Sul PC restano nel Windows
+    Credential Manager: il modulo che lo usa si importa solo li', perche'
+    carica DLL di Windows e su Linux fallirebbe gia' all'import.
+    """
+    email = os.environ.get("METEOHUB_EMAIL", "").strip()
+    access_key = os.environ.get("METEOHUB_ARCO_ACCESS_KEY", "").strip()
+    if email and access_key:
+        return email, access_key
+    if sys.platform != "win32":
+        raise RuntimeError(
+            "Credenziali METEOHUB mancanti: servono le variabili d'ambiente "
+            "METEOHUB_EMAIL e METEOHUB_ARCO_ACCESS_KEY (segreti del Worker)."
+        )
+    from stormshift_meteohub_secrets import get_arco_credentials as from_vault
+
+    return from_vault()
 
 
 @lru_cache(maxsize=1)

@@ -8,7 +8,7 @@
     cloudflared pubblica solamente i dati radar gia' elaborati.
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File C:\Users\gimmy\OneDrive\Desktop\Start-StormShift.ps1 -OpenBrowser
+    powershell -ExecutionPolicy Bypass -File C:\Users\gimmy\repos\Storm_Shift\Start-StormShift.ps1 -OpenBrowser
 #>
 
 [CmdletBinding()]
@@ -19,8 +19,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$desktop = Join-Path $env:USERPROFILE "OneDrive\Desktop"
-$serverScript = Join-Path $desktop "stormshift_meteohub_server.py"
+# Il server e' accanto a questo script (C:\Users\gimmy\repos\Storm_Shift).
+$serverScript = Join-Path $PSScriptRoot "stormshift_meteohub_server.py"
 $tunnelConfig = Join-Path $env:USERPROFILE ".cloudflared\stormshift.yml"
 $cloudflared = "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe"
 $dashboardUrl = "https://stormshift.gimmycloud.net/"
