@@ -109,7 +109,7 @@
 <div class="wrap">
   <header>
     <div class="t">STORM-SHIFT <b>▓</b> FVG CONVECTIVE OUTLOOK<span class="cur">_</span></div>
-    <div class="meta"><span id="meta">BOOT…<br>ICON seamless · Open-Meteo</span><br><span id="radar-status">RADAR: attesa bridge locale</span><br><span>StormShift v1.1.5</span></div>
+    <div class="meta"><span id="meta">BOOT…<br>ICON seamless · Open-Meteo</span><br><span id="radar-status">RADAR: attesa bridge locale</span><br><span>StormShift v1.1.6</span></div>
   </header>
 
   <div id="stage">
@@ -191,7 +191,7 @@
 </div>
 
 <script>
-const APP_VERSION="1.1.5";
+const APP_VERSION="1.1.6";
 const LAT0=45.55,LAT1=46.70,LON0=12.30,LON1=13.95;
 const NLAT=7,NLON=8;
 const FIELDS=["cape","convective_inhibition","freezing_level_height",
@@ -219,7 +219,7 @@ function level(cape,sh6){
   if(cape>=1500&&sh6>=20)return 3;
   if(cape>=800&&sh6>=15)return 2;
   if(cape>=300&&sh6>=10)return 1;
-  if(cape>=1500)return 1;
+  if(cape>=800)return 1;
   return 0;}
 const LCOL=["rgba(40,90,55,ALPHA)","rgba(255,207,51,ALPHA)","rgba(255,122,26,ALPHA)","rgba(255,46,46,ALPHA)"];
 
