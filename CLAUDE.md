@@ -105,9 +105,12 @@ Gimmy li ha scaricati dalla produzione e sono stati confrontati:
 - **Dashboard**: in produzione c'era la **1.1.4**, qui c'è la **1.1.5**, più
   nuova: pulsante METAGRAMMA, ◀1H/1H▶, nuovi tentativi con timeout su
   Open-Meteo, aggiornamento ogni 30 minuti. Il primo deploy porta quindi in
-  produzione la 1.1.5.
+  produzione la 1.1.6 (la 1.1.5 con la soglia L1 riportata a 800).
 - **Soglia L1 "solo CAPE"**: `CAPE ≥ 800` nella 1.1.4, `CAPE ≥ 1500` nella
-  1.1.5. È rimasta quella della 1.1.5; se si vuole l'altra, lo decide Gimmy.
+  1.1.5. Gimmy ha confermato **800** il 2026-09-25, e la dashboard è diventata
+  1.1.6. Il radar sulla mappa non dipende dalla soglia: si carica
+  all'apertura, ogni 5 minuti e con AGGIORNA, e si colora solo dove piove ad
+  almeno 0,2 mm/h.
 - La 1.1.4 in produzione aveva un CSS per il testo "⚠ PICCO" nel footer
   (larghezza fissa di 260px con "…"). **Non è stato riportato**: provato nel
   browser, con i pulsanti in più della 1.1.5 fa uscire il footer di 67px a
