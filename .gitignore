@@ -1,0 +1,47 @@
+# ─── CREDENZIALI — MAI committare ───────────────────────────────
+.cdsapirc
+*.cdsapirc
+*credential*
+*secret*.txt
+*.key
+*.pem
+*token*
+
+# ─── Dati grezzi scaricati (pesanti, rigenerabili) ──────────────
+era5_fvg/
+*.nc
+*.grib
+*.grib2
+*.idx
+*.zarr/
+
+# ─── Output / log (rigenerabili) ────────────────────────────────
+bridge_log.txt
+*.log
+match_era5_radar.csv
+# I cataloghi eventi sono derivati: scommenta per escluderli dal repo
+# catalogo_eventi_2024.csv
+# catalogo_percella_2024.csv
+
+# ─── Python ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# ─── OS / editor ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# ─── Cloudflare / Node (versione Worker + Container) ────────────
+.dev.vars
+.env
+.env.*
+.wrangler/
+node_modules/

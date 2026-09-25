@@ -1,0 +1,18 @@
+# STORM-SHIFT — dipendenze
+# Versioni del bridge bloccate allo stato verificato funzionante
+# (un aggiornamento di fsspec aveva rotto l'auth ARCO: da qui il pin).
+
+# --- Bridge radar + dashboard ---
+fastapi==0.136.0
+uvicorn==0.41.0
+fsspec==2026.3.0
+aiohttp==3.13.2
+xarray==2025.12.0
+zarr==3.3.0
+numpy==2.5.2
+
+# --- Calibrazione (ERA5 + radar storico) ---
+pandas>=2.2
+cdsapi>=0.7
+netcdf4>=1.6
+requests>=2.31

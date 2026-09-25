@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STORM-SHIFT // FVG CONVECTIVE OUTLOOK</title>
+<style>
+  :root{
+    --bg:#060a07; --panel:#0a1109; --phos:#39ff8c; --amber:#ffb000;
+    --dim:#1c3322; --grid:#12331f; --l1:#ffcf33; --l2:#ff7a1a; --l3:#ff2e2e;
+    --muted:#8eaa94; --danger-bg:rgba(255,46,46,.12);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;width:100%;background:var(--bg);color:var(--phos);
+    font-family:"Courier New",ui-monospace,monospace;overflow:hidden}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.22) 2px 3px);
+    mix-blend-mode:multiply}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:98;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.55) 100%)}
+  
+  .wrap{position:absolute;top:0;bottom:0;left:0;right:0;display:grid;
+    grid-template-columns:1fr 320px;grid-template-rows:auto 1fr auto;gap:0}
+  
+  header{grid-column:1/3;border-bottom:1px solid var(--dim);padding:8px 14px;
+    display:flex;justify-content:space-between;align-items:center;
+    text-shadow:0 0 6px rgba(57,255,140,.5)}
+  header .t{font-weight:bold;letter-spacing:2px;font-size:14px}
+  header .t b{color:var(--amber)}
+  .cur{animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  header .meta{font-size:11px;color:var(--phos);opacity:.7;text-align:right;line-height:1.3}
+  #stage{position:relative;background:
+    radial-gradient(circle at 50% 45%,rgba(20,60,35,.25),rgba(6,10,7,0) 70%);overflow:hidden}
+  #map{position:absolute;inset:0;width:100%;height:100%}
+  aside{border-left:1px solid var(--dim);padding:10px;background:var(--panel);
+    display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+  .box{border:1px solid var(--dim);padding:6px 8px}
+  .box h3{margin:0 0 4px;font-size:11px;letter-spacing:2px;color:var(--amber);
+    font-weight:normal;border-bottom:1px dashed var(--dim);padding-bottom:3px}
+  .kv{display:flex;justify-content:space-between;font-size:11px;margin:2px 0}
+  .kv b{color:#eaffea;font-weight:normal}
+  .big{font-size:22px;letter-spacing:1px}
+  .risk-box{border-color:rgba(255,176,0,.55);background:linear-gradient(135deg,rgba(255,176,0,.08),transparent 68%)}
+  .risk-box[data-level="2"],.risk-box[data-level="3"]{border-color:var(--l3);background:var(--danger-bg)}
+  #c-summary{color:#eaffea;font-size:11px;line-height:1.45;margin:5px 0 0}
+  .source-note{color:var(--muted);font-size:9px;line-height:1.35;margin:0}
+  #hodo{width:100%;height:190px;display:block;background:#040704;border:1px solid var(--dim)}
+  .wind-profile{display:grid;gap:4px;margin-top:6px}
+  .wind-row{display:grid;grid-template-columns:48px 1fr auto;gap:6px;align-items:center;
+    padding:4px 5px;border-left:3px solid var(--dim);background:rgba(57,255,140,.035);font-size:10px}
+  .wind-row strong{font-weight:normal;color:var(--amber)}
+  .wind-row span:last-child{color:#eaffea;white-space:nowrap}
+  .wind-row[data-alt="10m"]{border-color:#ff2e2e}
+  .wind-row[data-alt="850"]{border-color:#ff7a1a}
+  .wind-row[data-alt="700"]{border-color:#ffcf33}
+  .wind-row[data-alt="500"]{border-color:#39ff8c}
+  footer{grid-column:1/3;border-top:1px solid var(--dim);padding:8px 14px;
+    display:flex;align-items:center;gap:12px;font-size:11px;background:#080d09;min-height:36px}
+  footer input[type=range]{flex:1;accent-color:var(--amber);height:4px;cursor:pointer}
+  button{background:#0d1a0f;color:var(--phos);border:1px solid var(--dim);
+    font-family:inherit;padding:3px 10px;cursor:pointer;letter-spacing:1px;font-size:11px}
+  button:hover{border-color:var(--phos);box-shadow:0 0 8px rgba(57,255,140,.3)}
+  button.active{border-color:#32b7ff;color:#bdeaff;box-shadow:0 0 8px rgba(50,183,255,.3)}
+  #metagram{border-color:var(--amber);color:var(--amber);box-shadow:0 0 8px rgba(255,176,0,.18)}
+  #metagram:hover{box-shadow:0 0 12px rgba(255,176,0,.4)}
+  button:disabled{cursor:wait;opacity:.6}
+  select{background:#0d1a0f;color:#eaffea;border:1px solid var(--dim);font:inherit;font-size:11px;
+    padding:3px 6px;max-width:150px}
+  .leg{display:flex;gap:8px;font-size:10px;align-items:center}
+  .sw{width:10px;height:10px;display:inline-block;margin-right:3px;vertical-align:middle}
+  .warn{color:var(--l3);font-weight:bold;text-shadow:0 0 8px rgba(255,46,46,.6);font-size:11px}
+  .tag{position:absolute;top:6px;left:10px;font-size:11px;color:var(--amber);
+    letter-spacing:2px;z-index:5}
+  .demo{position:absolute;top:6px;right:10px;font-size:10px;color:var(--l3);
+    border:1px solid var(--l3);padding:2px 6px;z-index:5;display:none}
+  .map-help{position:absolute;right:10px;bottom:8px;z-index:5;color:var(--muted);font-size:10px;
+    background:rgba(6,10,7,.78);border:1px solid var(--dim);padding:4px 6px}
+  #bull{position:fixed;inset:0;z-index:200;background:rgba(3,6,4,.92);
+    display:none;align-items:center;justify-content:center}
+  #bull .card{width:min(680px,92vw);max-height:86vh;overflow:auto;background:#070d08;
+    border:1px solid var(--phos);box-shadow:0 0 34px rgba(57,255,140,.28);padding:16px 22px}
+  #bull h2{margin:0;font-size:13px;letter-spacing:3px;color:var(--amber)}
+  #bull pre{white-space:pre-wrap;font-family:inherit;font-size:12px;line-height:1.5;
+    color:var(--phos);text-shadow:0 0 4px rgba(57,255,140,.3);margin:12px 0}
+  #bull .row{display:flex;gap:10px;flex-wrap:wrap}
+  @media (max-width:760px){
+    html,body{height:auto;min-height:100%;overflow:auto}
+    .wrap{position:relative;min-height:100vh;grid-template-columns:1fr;grid-template-rows:auto minmax(54vh,68vh) auto auto}
+    header,footer{grid-column:1;align-items:flex-start}
+    header .t{font-size:12px;letter-spacing:1px}
+    header .meta{font-size:9px}
+    aside{grid-row:3;border-left:0;border-top:1px solid var(--dim);display:grid;grid-template-columns:1fr 1fr;align-items:start}
+    aside .box:first-child{grid-column:1/3}
+    #hodo{height:auto}
+    footer{grid-row:4;flex-wrap:wrap;gap:8px;padding:8px 10px}
+    footer input[type=range]{order:3;flex-basis:100%}
+    #clock{margin-left:auto;min-width:0!important}
+    .map-help{display:none}
+    .tag{font-size:9px;letter-spacing:1px}
+  }
+  @media (max-width:390px){
+    aside{display:flex}
+    header .meta{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="t">STORM-SHIFT <b>▓</b> FVG CONVECTIVE OUTLOOK<span class="cur">_</span></div>
+    <div class="meta"><span id="meta">BOOT…<br>ICON seamless · Open-Meteo</span><br><span id="radar-status">RADAR: attesa bridge locale</span><br><span>StormShift v1.1.5</span></div>
+  </header>
+
+  <div id="stage">
+    <div class="tag" id="tag">GRID: — · CURSORE —</div>
+    <div class="demo" id="demo">⚠ DEMO DATA (fetch fallito)</div>
+    <div class="map-help">clicca una cella · trascina il cursore nel tempo</div>
+    <canvas id="map"></canvas>
+  </div>
+
+  <aside>
+    <div class="box risk-box" id="risk-box" data-level="0" aria-live="polite">
+      <h3>VALUTAZIONE OPERATIVA</h3>
+      <div class="kv"><span>scenario</span><b id="c-scenario">—</b></div>
+      <p id="c-summary">Caricamento dei parametri convettivi…</p>
+      <p class="source-note" id="c-regional">Analisi regionale delle prossime 24 ore in attesa dei dati.</p>
+    </div>
+    <div class="box">
+      <h3>CELLA SELEZIONATA</h3>
+      <div class="kv"><span>riferimento</span><b id="c-location">—</b></div>
+      <div class="kv"><span>coord</span><b id="c-coord">—</b></div>
+      <div class="kv"><span>livello</span><b id="c-lvl" class="big">—</b></div>
+      <div class="kv"><span>CAPE</span><b id="c-cape">— J/kg</b></div>
+      <div class="kv"><span>lapse rate (850-500)</span><b id="c-lr">—</b></div>
+      <div class="kv"><span>shear 0-6km</span><b id="c-sh6">— m/s</b></div>
+      <div class="kv"><span>shear 0-3km</span><b id="c-sh3">— m/s</b></div>
+      <div class="kv"><span>CIN</span><b id="c-cin">—</b></div>
+      <div class="kv"><span>zero termico</span><b id="c-fz">— m</b></div>
+      <div class="kv"><span>comp index (SCP)</span><b id="c-comp">—</b></div>
+      <div class="kv"><span>pioggia radar</span><b id="c-radar">in attesa</b></div>
+    </div>
+    <div class="box">
+      <h3>PROFILO DEL VENTO</h3>
+      <div class="wind-profile" id="wind-profile" aria-label="Vento previsto a diverse quote">
+        <div class="wind-row" data-alt="10m"><strong>SUOLO</strong><span id="w-10m">—</span><span>—</span></div>
+        <div class="wind-row" data-alt="850"><strong>1.5 km</strong><span id="w-850">—</span><span>850 hPa</span></div>
+        <div class="wind-row" data-alt="700"><strong>3 km</strong><span id="w-700">—</span><span>700 hPa</span></div>
+        <div class="wind-row" data-alt="500"><strong>5.5 km</strong><span id="w-500">—</span><span>500 hPa</span></div>
+      </div>
+      <div class="kv" style="margin-top:6px"><span>rotazione con la quota</span><b id="c-turn">—</b></div>
+    </div>
+    <div class="box">
+      <h3>LEGENDA</h3>
+      <div class="leg"><span><i class="sw" style="background:var(--l1)"></i>L1</span>
+        <span><i class="sw" style="background:var(--l2)"></i>L2</span>
+        <span><i class="sw" style="background:var(--l3)"></i>L3</span>
+        <span style="opacity:.6">blu→rosso = pioggia radar</span></div>
+    </div>
+    <p class="source-note">Rischio da previsione ICON; precipitazione da radar METEOHUB. Non sostituisce le allerte della Protezione Civile.</p>
+  </aside>
+
+  <footer>
+    <button id="play">▶ PLAY</button>
+    <button id="metagram" title="Apri il metagramma della località selezionata">▥ METAGRAMMA</button>
+    <select id="city" aria-label="Seleziona una località">
+      <option value="">SELEZIONA LOCALITÀ</option>
+    </select>
+    <button id="radarbtn" class="active" title="Mostra o nasconde il radar METEOHUB">◉ RADAR LIVE</button>
+    <button id="radarloop" title="Anima l'ultima ora del radar METEOHUB">↻ LOOP 60'</button>
+    <button id="bullbtn">📢 BOLLETTINO</button>
+    <button id="refresh" title="Aggiorna i dati da Open-Meteo">↻ AGGIORNA</button>
+    <button id="prev-time" title="Ora precedente">◀ 1H</button>
+    <input type="range" id="time" min="0" max="47" value="14" step="1" aria-label="Selezione orario">
+    <button id="next-time" title="Ora successiva">1H ▶</button>
+    <span id="clock" style="min-width:140px">—</span>
+    <span id="peak" class="warn"></span>
+  </footer>
+</div>
+
+<div id="bull">
+  <div class="card">
+    <h2>📢 BOLLETTINO CONVETTIVO — FVG</h2>
+    <pre id="btext"></pre>
+    <div class="row">
+      <button id="b-speak">📢 ANNUNCIA (voce)</button>
+      <button id="b-copy">⧉ COPIA</button>
+      <button id="b-close">✕ CHIUDI</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const APP_VERSION="1.1.5";
+const LAT0=45.55,LAT1=46.70,LON0=12.30,LON1=13.95;
+const NLAT=7,NLON=8;
+const FIELDS=["cape","convective_inhibition","freezing_level_height",
+  "wind_speed_10m","wind_direction_10m","wind_speed_850hPa","wind_direction_850hPa",
+  "wind_speed_700hPa","wind_direction_700hPa","wind_speed_500hPa","wind_direction_500hPa",
+  "temperature_850hPa","temperature_500hPa"];
+const FVG=[[13.517,46.383],[13.517,46.377],[13.470,46.361],[13.439,46.360],[13.447,46.330],[13.418,46.318],[13.403,46.300],[13.376,46.298],[13.392,46.280],[13.406,46.243],[13.422,46.234],[13.411,46.212],[13.423,46.206],[13.446,46.213],[13.448,46.225],[13.484,46.225],[13.503,46.216],[13.530,46.217],[13.529,46.212],[13.552,46.209],[13.561,46.204],[13.567,46.186],[13.589,46.191],[13.615,46.184],[13.646,46.188],[13.663,46.180],[13.664,46.171],[13.645,46.138],[13.572,46.089],[13.547,46.083],[13.530,46.068],[13.501,46.062],[13.497,46.049],[13.510,46.046],[13.507,46.032],[13.497,46.018],[13.476,46.006],[13.500,45.982],[13.541,45.965],[13.569,45.969],[13.590,45.990],[13.620,45.984],[13.633,45.989],[13.642,45.984],[13.636,45.934],[13.609,45.899],[13.595,45.892],[13.597,45.887],[13.590,45.888],[13.591,45.873],[13.577,45.858],[13.574,45.843],[13.589,45.831],[13.596,45.808],[13.603,45.804],[13.623,45.798],[13.671,45.798],[13.736,45.760],[13.796,45.743],[13.811,45.723],[13.834,45.707],[13.833,45.690],[13.858,45.666],[13.919,45.634],[13.874,45.610],[13.849,45.585],[13.839,45.582],[13.787,45.583],[13.746,45.598],[13.723,45.595],[13.720,45.606],[13.731,45.609],[13.757,45.608],[13.783,45.599],[13.807,45.607],[13.808,45.613],[13.779,45.617],[13.774,45.624],[13.777,45.634],[13.767,45.637],[13.766,45.631],[13.757,45.628],[13.756,45.636],[13.747,45.639],[13.755,45.650],[13.760,45.647],[13.769,45.653],[13.753,45.680],[13.631,45.768],[13.581,45.782],[13.580,45.777],[13.562,45.778],[13.533,45.805],[13.545,45.793],[13.530,45.788],[13.548,45.783],[13.525,45.770],[13.517,45.744],[13.554,45.729],[13.553,45.725],[13.531,45.723],[13.487,45.705],[13.465,45.707],[13.468,45.703],[13.459,45.693],[13.433,45.679],[13.386,45.675],[13.368,45.683],[13.343,45.681],[13.291,45.704],[13.257,45.708],[13.246,45.720],[13.245,45.713],[13.186,45.711],[13.152,45.701],[13.147,45.689],[13.110,45.664],[13.101,45.643],[13.083,45.650],[13.081,45.659],[13.063,45.657],[13.066,45.673],[13.044,45.685],[13.053,45.695],[13.037,45.699],[13.039,45.717],[13.029,45.736],[13.008,45.725],[13.016,45.736],[13.015,45.742],[13.001,45.749],[13.006,45.766],[12.978,45.788],[12.992,45.798],[12.981,45.797],[12.975,45.808],[12.978,45.814],[12.988,45.809],[12.993,45.815],[12.973,45.820],[12.982,45.827],[12.974,45.823],[12.971,45.829],[12.979,45.834],[12.961,45.847],[12.952,45.844],[12.952,45.822],[12.929,45.817],[12.921,45.831],[12.915,45.825],[12.908,45.829],[12.890,45.820],[12.870,45.834],[12.876,45.846],[12.861,45.851],[12.837,45.845],[12.809,45.820],[12.800,45.827],[12.803,45.845],[12.780,45.854],[12.743,45.827],[12.730,45.837],[12.670,45.791],[12.650,45.802],[12.654,45.810],[12.647,45.820],[12.638,45.818],[12.606,45.838],[12.594,45.831],[12.594,45.815],[12.565,45.832],[12.559,45.826],[12.550,45.839],[12.557,45.843],[12.550,45.861],[12.531,45.863],[12.533,45.880],[12.508,45.897],[12.523,45.903],[12.510,45.909],[12.506,45.923],[12.467,45.932],[12.453,45.947],[12.426,45.947],[12.427,45.996],[12.415,46.027],[12.399,46.041],[12.436,46.083],[12.485,46.107],[12.497,46.130],[12.495,46.150],[12.447,46.180],[12.442,46.199],[12.446,46.208],[12.405,46.208],[12.400,46.211],[12.409,46.222],[12.402,46.229],[12.376,46.223],[12.356,46.231],[12.324,46.256],[12.321,46.265],[12.329,46.283],[12.351,46.294],[12.355,46.320],[12.375,46.329],[12.410,46.331],[12.421,46.343],[12.417,46.355],[12.429,46.352],[12.463,46.369],[12.455,46.392],[12.469,46.390],[12.499,46.412],[12.492,46.424],[12.505,46.440],[12.525,46.449],[12.530,46.464],[12.542,46.458],[12.568,46.476],[12.607,46.464],[12.621,46.475],[12.662,46.468],[12.654,46.484],[12.630,46.501],[12.619,46.540],[12.629,46.561],[12.644,46.576],[12.657,46.573],[12.688,46.600],[12.708,46.602],[12.705,46.618],[12.711,46.626],[12.762,46.648],[12.792,46.643],[12.809,46.631],[12.831,46.631],[12.837,46.627],[12.834,46.611],[12.847,46.606],[12.922,46.609],[13.045,46.596],[13.094,46.599],[13.164,46.589],[13.193,46.573],[13.215,46.570],[13.233,46.554],[13.267,46.560],[13.321,46.552],[13.346,46.569],[13.368,46.568],[13.373,46.579],[13.406,46.572],[13.408,46.562],[13.425,46.558],[13.476,46.558],[13.504,46.566],[13.518,46.547],[13.548,46.553],[13.564,46.551],[13.570,46.539],[13.597,46.546],[13.627,46.542],[13.675,46.523],[13.714,46.523],[13.716,46.508],[13.703,46.501],[13.708,46.483],[13.695,46.468],[13.697,46.454],[13.689,46.440],[13.648,46.446],[13.599,46.439],[13.580,46.428],[13.577,46.409],[13.570,46.402],[13.517,46.383]];
+const CITIES=[["Udine",13.23,46.07],["Trieste",13.77,45.65],["Pordenone",12.66,45.96],
+  ["Gorizia",13.62,45.94],["Tolmezzo",13.02,46.40],["■ Rodeano Basso",13.02,46.13]];
+
+let lats=[],lons=[],cells=[],times=[],tIdx=14,sel=null,playing=false,demo=false,loopStarted=false;
+let radarData=null,radarVisible=true,radarFrames=[],radarLoopTimer=null,radarFrameIndex=0;
+for(let j=0;j<NLAT;j++)for(let i=0;i<NLON;i++){
+  lats.push(+(LAT0+(j+0.5)*(LAT1-LAT0)/NLAT).toFixed(3));
+  lons.push(+(LON0+(i+0.5)*(LON1-LON0)/NLON).toFixed(3));
+}
+
+const d2r=Math.PI/180;
+function uv(spd,dir){const s=(spd||0)/3.6,r=dir*d2r;return[-s*Math.sin(r),-s*Math.cos(r)];}
+function shear(h,i,lvl){const[u0,v0]=uv(h["wind_speed_10m"][i],h["wind_direction_10m"][i]);
+  const[u1,v1]=uv(h["wind_speed_"+lvl][i],h["wind_direction_"+lvl][i]);
+  return Math.hypot(u1-u0,v1-v0);}
+function level(cape,sh6){
+  if(cape==null||cape<100)return 0;
+  if(cape>=1500&&sh6>=20)return 3;
+  if(cape>=800&&sh6>=15)return 2;
+  if(cape>=300&&sh6>=10)return 1;
+  if(cape>=1500)return 1;
+  return 0;}
+const LCOL=["rgba(40,90,55,ALPHA)","rgba(255,207,51,ALPHA)","rgba(255,122,26,ALPHA)","rgba(255,46,46,ALPHA)"];
+
+const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+const RETRY_ATTEMPTS=3,RETRY_DELAY_MS=1500,FETCH_TIMEOUT_MS=20000;
+async function load(){
+  const refreshButton=document.getElementById("refresh");
+  refreshButton.disabled=true; refreshButton.textContent="… CARICO";
+  demo=false;
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lats.join(",")}`+
+    `&longitude=${lons.join(",")}&hourly=${FIELDS.join(",")}`+
+    `&models=icon_seamless&timezone=Europe%2FRome&forecast_days=3`;
+  let lastError=null;
+  for(let attempt=1;attempt<=RETRY_ATTEMPTS;attempt++){
+    const controller=new AbortController();
+    const timeoutId=setTimeout(()=>controller.abort(),FETCH_TIMEOUT_MS);
+    try{
+      const r=await fetch(url,{signal:controller.signal}); if(!r.ok)throw new Error(`HTTP ${r.status}`);
+      let d=await r.json(); if(!Array.isArray(d))d=[d];
+      if(d.length !== lats.length || d.some(p=>!p.hourly?.time || !Array.isArray(p.hourly.cape)))
+        throw new Error("Risposta Open-Meteo incompleta");
+      cells=d.map((p,k)=>({lat:lats[k],lon:lons[k],h:p.hourly}));
+      times=cells[0].h.time;
+      lastError=null; break;
+    }catch(e){
+      lastError=e.name==="AbortError"?new Error(`Timeout dopo ${FETCH_TIMEOUT_MS/1000}s`):e;
+      console.warn(`Tentativo ${attempt}/${RETRY_ATTEMPTS} fallito:`,lastError);
+      if(attempt<RETRY_ATTEMPTS){
+        refreshButton.textContent=`… RITENTO (${attempt}/${RETRY_ATTEMPTS})`;
+        await sleep(RETRY_DELAY_MS);
+      }
+    }finally{
+      clearTimeout(timeoutId);
+    }
+  }
+  if(lastError){ console.warn("Impossibile caricare la previsione dopo i tentativi:",lastError); demo=true; buildDemo(); }
+  document.getElementById("demo").style.display=demo?"block":"none";
+  const now=new Date();
+  document.getElementById("meta").innerHTML=
+    (demo?"<span style='color:#ff2e2e'>DEMO</span>":"LIVE")+
+    " · ICON seamless · Open-Meteo<br>agg. "+now.toLocaleTimeString("it-IT");
+  const nextHour=times.findIndex(t=>new Date(t)>=new Date());
+  tIdx=nextHour===-1?Math.max(0,times.length-1):nextHour;
+  const slider=document.getElementById("time");
+  slider.max=Math.max(0,times.length-1); slider.value=tIdx;
+  refreshButton.disabled=false; refreshButton.textContent="↻ AGGIORNA";
+  if(!loopStarted){loopStarted=true;loop();}
+}
+function buildDemo(){
+  const T=[];const base=new Date();base.setHours(0,0,0,0);
+  for(let k=0;k<48;k++){const dt=new Date(base.getTime()+k*3600e3);
+    T.push(dt.toISOString().slice(0,16));}
+  times=T;
+  cells=lats.map((la,k)=>{
+    const lo=lons[k];const h={time:T};FIELDS.forEach(f=>h[f]=[]);
+    for(let t=0;t<48;t++){
+      const hr=+T[t].slice(11,13);
+      const diurnal=Math.max(0,Math.sin((hr-6)/12*Math.PI));
+      const g=(1-(la-LAT0)/(LAT1-LAT0))*0.6+((lo-LON0)/(LON1-LON0))*0.2;
+      const day2=t>24?0.55:1;
+      const cape=Math.max(0,(1400*diurnal*g*day2)+ (Math.sin(k*1.3+t)*80));
+      h.cape.push(Math.round(cape));
+      h.convective_inhibition.push(Math.round(120*(1-diurnal)));
+      h.freezing_level_height.push(3600+Math.round(700*g));
+      h.wind_speed_10m.push(8+6*Math.sin(k+t*0.3));h.wind_direction_10m.push((160+t*4)%360);
+      h.wind_speed_850hPa.push(20+10*g);h.wind_direction_850hPa.push((200+t*3)%360);
+      h.wind_speed_700hPa.push(35+14*g);h.wind_direction_700hPa.push((225+t*2)%360);
+      h.wind_speed_500hPa.push(55+22*g);h.wind_direction_500hPa.push((250+t)%360);
+      h.temperature_850hPa.push(18 - g*4); h.temperature_500hPa.push(-12 - g*6);
+    }
+    return{lat:la,lon:lo,h};
+  });
+}
+
+let W,H,PAD=24;
+function px(lon){return PAD+(lon-LON0)/(LON1-LON0)*(W-2*PAD);}
+function py(lat){return PAD+(LAT1-lat)/(LAT1-LAT0)*(H-2*PAD);}
+
+const cv=document.getElementById("map"),cx=cv.getContext("2d");
+function resize(){const s=cv.parentElement.getBoundingClientRect();
+  cv.width=s.width;cv.height=s.height;W=cv.width;H=cv.height;}
+window.addEventListener("resize",()=>{resize();});
+function radarColor(rate){
+  if(rate<0.2)return null;
+  if(rate<1)return `rgba(45,120,255,${Math.min(.52,.18+rate*.2)})`;
+  if(rate<4)return "rgba(35,210,255,.58)";
+  if(rate<12)return "rgba(80,255,105,.65)";
+  if(rate<30)return "rgba(255,207,51,.72)";
+  if(rate<60)return "rgba(255,122,26,.8)";
+  return "rgba(255,46,46,.88)";
+}
+function drawRadar(){
+  if(!radarVisible||!radarData)return;
+  const values=radarData.values,latitudes=radarData.latitudes,longitudes=radarData.longitudes;
+  if(!values?.length||!longitudes?.[0]?.length)return;
+  const cellWidth=longitudes[0].length>1?Math.abs(px(longitudes[0][1])-px(longitudes[0][0]))+1:5;
+  const cellHeight=latitudes.length>1?Math.abs(py(latitudes[1][0])-py(latitudes[0][0]))+1:5;
+  for(let y=0;y<values.length;y++)for(let x=0;x<values[y].length;x++){
+    const color=radarColor(values[y][x]);
+    if(!color)continue;
+    cx.fillStyle=color;
+    cx.fillRect(px(longitudes[y][x])-cellWidth/2,py(latitudes[y][x])-cellHeight/2,cellWidth,cellHeight);
+  }
+}
+function radarRateAt(lat,lon){
+  if(!radarData)return null;
+  let bestRate=null,bestDistance=Infinity;
+  for(let y=0;y<radarData.values.length;y++)for(let x=0;x<radarData.values[y].length;x++){
+    const distance=(radarData.latitudes[y][x]-lat)**2+(radarData.longitudes[y][x]-lon)**2;
+    if(distance<bestDistance){bestDistance=distance;bestRate=radarData.values[y][x];}
+  }
+  return bestRate>=0?bestRate:null;
+}
+function draw(ts){
+  const pulse=0.5+0.5*Math.sin(ts/380);
+  cx.clearRect(0,0,W,H);
+  cx.strokeStyle="rgba(20,70,40,.35)";cx.lineWidth=1;cx.font="9px monospace";
+  cx.fillStyle="rgba(57,255,140,.35)";
+  for(let L=13;L<=14;L+=0.5){const x=px(L);cx.beginPath();cx.moveTo(x,PAD);cx.lineTo(x,H-PAD);cx.stroke();cx.fillText(L+"°E",x+2,H-PAD+2);}
+  for(let L=46;L>=45.5;L-=0.5){const y=py(L);cx.beginPath();cx.moveTo(PAD,y);cx.lineTo(W-PAD,y);cx.stroke();cx.fillText(L+"°N",PAD+2,y-2);}
+  const dxp=(W-2*PAD)/NLON, dyp=(H-2*PAD)/NLAT;
+  let worst={lv:-1};
+  cells.forEach(c=>{
+    const h=c.h,i=tIdx;const cape=h.cape[i];
+    const sh6=shear(h,i,"500hPa"),lv=level(cape,sh6);
+    const comp=(cape||0)/1000*sh6/20;
+    const cxp=px(c.lon),cyp=py(c.lat);
+    let a=0.12+Math.min(.6,comp*0.4);
+    if(lv>=3)a=0.45+0.4*pulse; else if(lv>=2)a=0.4+0.25*pulse;
+    cx.fillStyle=LCOL[lv].replace("ALPHA",a.toFixed(2));
+    cx.fillRect(cxp-dxp/2,cyp-dyp/2,dxp,dyp);
+    if(comp>worst.comp||worst.lv<0){worst={lv,comp,cape,sh6,lat:c.lat,lon:c.lon};}
+  });
+  drawRadar();
+  cx.strokeStyle="rgba(57,255,140,.85)";cx.lineWidth=1.1;
+  cx.shadowColor="rgba(57,255,140,.7)";cx.shadowBlur=6;cx.beginPath();
+  FVG.forEach((p,k)=>{const x=px(p[0]),y=py(p[1]);k?cx.lineTo(x,y):cx.moveTo(x,y);});
+  cx.closePath();cx.stroke();cx.shadowBlur=0;
+  cx.fillStyle="rgba(234,255,234,.9)";cx.font="10px monospace";
+  CITIES.forEach(([n,lo,la])=>{const x=px(lo),y=py(la);
+    cx.fillStyle=n.includes("■")?"#ff7a1a":"rgba(234,255,234,.9)";
+    cx.fillRect(x-1.5,y-1.5,3,3);cx.fillText(n,x+5,y+3);});
+  if(sel){const x=px(sel.lon),y=py(sel.lat);
+    cx.strokeStyle="#ffb000";cx.lineWidth=1.4;
+    cx.strokeRect(x-dxp/2,y-dyp/2,dxp,dyp);
+    cx.beginPath();cx.moveTo(x-9,y);cx.lineTo(x+9,y);cx.moveTo(x,y-9);cx.lineTo(x,y+9);cx.stroke();}
+  const pe=document.getElementById("peak");
+  pe.textContent = worst.lv>=2 ? `⚠ PICCO L${worst.lv} @ ${worst.lat.toFixed(2)},${worst.lon.toFixed(2)} · CAPE ${worst.cape.toFixed(0)} · shear ${worst.sh6.toFixed(1)}` : "";
+}
+
+function drawHodo(){
+  const output=["w-10m","w-850","w-700","w-500"];
+  if(!sel){
+    output.forEach(id=>document.getElementById(id).textContent="—");
+    document.getElementById("c-turn").textContent="—";
+    return;
+  }
+  const h=sel.h,i=tIdx;
+  const levels=[
+    ["w-10m","wind_speed_10m","wind_direction_10m"],
+    ["w-850","wind_speed_850hPa","wind_direction_850hPa"],
+    ["w-700","wind_speed_700hPa","wind_direction_700hPa"],
+    ["w-500","wind_speed_500hPa","wind_direction_500hPa"]
+  ];
+  levels.forEach(([id,speed,direction])=>{
+    const spd=h[speed][i],dir=h[direction][i];
+    document.getElementById(id).textContent=`da ${windDirection(dir)} (${Math.round(dir)}°) · ${Math.round(spd)} km/h`;
+  });
+  const from=h.wind_direction_10m[i], to=h.wind_direction_500hPa[i];
+  let rotation=((to-from+540)%360)-180;
+  document.getElementById("c-turn").textContent=
+    Math.abs(rotation)<20?"quasi costante":
+    rotation>0?`ruota a destra di ${Math.round(rotation)}°`:`ruota a sinistra di ${Math.round(-rotation)}°`;
+}
+
+function windDirection(degrees){
+  const directions=["N","NE","E","SE","S","SO","O","NO"];
+  return directions[Math.round((((degrees%360)+360)%360)/45)%8];
+}
+
+function updatePanel(){
+  const g=id=>document.getElementById(id);
+  if(!sel){
+    ["c-location","c-coord","c-cape","c-sh6","c-sh3","c-cin","c-fz","c-comp","c-lr","c-radar"].forEach(x=>{if(g(x))g(x).textContent="—";});
+    g("c-lvl").textContent="—";return;
+  }
+  const h=sel.h,i=tIdx,cape=h.cape[i];
+  const sh6=shear(h,i,"500hPa"),sh3=shear(h,i,"700hPa");
+  
+  const t850 = h.temperature_850hPa ? h.temperature_850hPa[i] : null;
+  const t500 = h.temperature_500hPa ? h.temperature_500hPa[i] : null;
+  let lr = 0;
+  if(t850 != null && t500 != null) lr = (t850 - t500) / 4.0;
+  
+  const cin = h.convective_inhibition[i] || 0;
+  const capeTerm = (cape||0) / 1000;
+  const sh6Term = Math.max(0, sh6 - 10) / 10;
+  const sh3Term = (sh3||0) / 15;
+  const cinPenalty = cin > 50 ? (50 / cin) : 1;
+  const comp = capeTerm * sh6Term * sh3Term * cinPenalty * (lr > 6.5 ? 1.5 : 1);
+  const lv = level(cape, sh6);
+  const RISK_TEXT=[
+    "Nessun segnale convettivo rilevante nella cella e nell'ora selezionate.",
+    "Possibili rovesci o temporali isolati. Segui gli aggiornamenti locali.",
+    "Temporali organizzati possibili: grandine e raffiche sono i pericoli principali.",
+    "Scenario severo favorevole: possibili grandine distruttiva, downburst e supercelle."
+  ];
+
+  const city=nearestCity(sel.lat,sel.lon);
+  g("c-location").textContent=city[0].replace("■ ","");
+  g("c-coord").textContent=sel.lat.toFixed(2)+"N "+sel.lon.toFixed(2)+"E";
+  const LB=["· QUIETE","▲ L1","▲▲ L2","▲▲▲ L3"];const LC=["#39ff8c","#ffcf33","#ff7a1a","#ff2e2e"];
+  g("c-lvl").textContent=LB[lv];g("c-lvl").style.color=LC[lv];
+  g("c-cape").textContent=(cape!=null?cape.toFixed(0):"—")+" J/kg";
+  g("c-sh6").textContent=sh6.toFixed(1)+" m/s";
+  g("c-sh3").textContent=sh3.toFixed(1)+" m/s";
+  g("c-cin").textContent=cin.toFixed(0);
+  g("c-fz").textContent=(h.freezing_level_height[i]!=null?h.freezing_level_height[i].toFixed(0):"—")+" m";
+  g("c-comp").textContent=comp.toFixed(2);
+  g("c-comp").style.color=comp>1?"#ff7a1a":"#eaffea";
+  const radarRate=radarRateAt(sel.lat,sel.lon);
+  g("c-radar").textContent=radarRate==null?"non disponibile":
+    radarRate<0.2?"assente (<0.2 mm/h)":radarRate.toFixed(1)+" mm/h";
+  g("c-radar").style.color=radarRate==null||radarRate<0.2?"#eaffea":radarRate<12?"#32b7ff":"#ff7a1a";
+  g("c-scenario").textContent=["QUIETE","L1 · ATTENZIONE","L2 · ELEVATO","L3 · SEVERO"][lv];
+  g("c-scenario").style.color=LC[lv];
+  g("c-summary").textContent=RISK_TEXT[lv];
+  g("risk-box").dataset.level=lv;
+  
+  if(g("c-lr")) {
+    g("c-lr").textContent = (lr > 0 ? lr.toFixed(1) + " °C/km" : "—");
+    g("c-lr").style.color = lr >= 7.0 ? "#ff2e2e" : (lr > 6.0 ? "#ffcf33" : "#eaffea");
+  }
+}
+
+function nearestCity(lat,lon){
+  return CITIES.reduce((nearest,city)=>{
+    const nearestDistance=(nearest[1]-lon)**2+(nearest[2]-lat)**2;
+    const cityDistance=(city[1]-lon)**2+(city[2]-lat)**2;
+    return cityDistance<nearestDistance?city:nearest;
+  });
+}
+
+function updateRegionalSummary(){
+  if(!cells.length)return;
+  const horizon=Math.min(24,times.length);
+  let peak={level:-1,cape:0,shear:0,index:0,cell:null};
+  cells.forEach(cell=>{
+    for(let i=0;i<horizon;i++){
+      const cape=cell.h.cape[i]||0, sh6=shear(cell.h,i,"500hPa"),risk=level(cape,sh6);
+      if(risk>peak.level || (risk===peak.level && cape>peak.cape))
+        peak={level:risk,cape,shear:sh6,index:i,cell};
+    }
+  });
+  const label=["nessun segnale significativo","attenzione ordinaria","criticità elevata","scenario severo"][peak.level];
+  const time=times[peak.index].slice(8,10)+"/"+times[peak.index].slice(5,7)+" "+times[peak.index].slice(11,16);
+  const place=nearestCity(peak.cell.lat,peak.cell.lon)[0].replace("■ ","");
+  document.getElementById("c-regional").textContent=
+    `PROSSIME 24H: ${label.toUpperCase()} · picco vicino a ${place}, ${time}.`;
+}
+
+function selectClosestCell(lat,lon){
+  sel=cells.reduce((best,cell)=>{
+    const bestDistance=(best.lat-lat)**2+(best.lon-lon)**2;
+    const cellDistance=(cell.lat-lat)**2+(cell.lon-lon)**2;
+    return cellDistance<bestDistance?cell:best;
+  });
+  updatePanel();drawHodo();
+}
+
+cv.addEventListener("mousemove",e=>{
+  const r=cv.getBoundingClientRect();
+  const lon=LON0+(e.clientX-r.left-PAD)/(W-2*PAD)*(LON1-LON0);
+  const lat=LAT1-(e.clientY-r.top-PAD)/(H-2*PAD)*(LAT1-LAT0);
+  document.getElementById("tag").textContent=
+    `GRID ${NLON}×${NLAT} · CURSORE ${lat.toFixed(2)}N ${lon.toFixed(2)}E`;
+});
+cv.addEventListener("mouseleave",()=>{
+  document.getElementById("tag").textContent=`GRID ${NLON}×${NLAT} · seleziona una cella`;
+});
+cv.addEventListener("click",e=>{
+  const r=cv.getBoundingClientRect();
+  const lon=LON0+(e.clientX-r.left-PAD)/(W-2*PAD)*(LON1-LON0);
+  const lat=LAT1-(e.clientY-r.top-PAD)/(H-2*PAD)*(LAT1-LAT0);
+  selectClosestCell(lat,lon);
+});
+const timeEl=document.getElementById("time");
+function setTimeIndex(index){
+  tIdx=Math.max(0,Math.min(index,times.length-1));
+  timeEl.value=tIdx;
+  tick();
+}
+function pausePlayback(){
+  if(!playing)return;
+  playing=false;
+  document.getElementById("play").textContent="▶ PLAY";
+}
+timeEl.addEventListener("input",()=>{pausePlayback();setTimeIndex(+timeEl.value);});
+document.getElementById("prev-time").addEventListener("click",()=>{
+  pausePlayback();setTimeIndex(tIdx-1);
+});
+document.getElementById("next-time").addEventListener("click",()=>{
+  pausePlayback();setTimeIndex(tIdx+1);
+});
+document.getElementById("metagram").addEventListener("click",()=>{
+  const [name,lon,lat]=nearestCity(sel?.lat ?? 46.13,sel?.lon ?? 13.02);
+  const query=new URLSearchParams({name:name.replace("■ ",""),lat:lat.toFixed(3),lon:lon.toFixed(3)});
+  window.location.href=`/metagram.html?${query}`;
+});
+document.getElementById("play").addEventListener("click",e=>{
+  playing=!playing;e.target.textContent=playing?"❚❚ PAUSE":"▶ PLAY";});
+const radarButton=document.getElementById("radarbtn");
+radarButton.addEventListener("click",()=>{
+  radarVisible=!radarVisible;
+  radarButton.classList.toggle("active",radarVisible);
+  radarButton.textContent=radarVisible?"◉ RADAR LIVE":"○ RADAR NASCOSTO";
+});
+const radarLoopButton=document.getElementById("radarloop");
+radarLoopButton.addEventListener("click",async()=>{
+  if(radarLoopTimer){stopRadarLoop();return;}
+  radarLoopButton.disabled=true;radarLoopButton.textContent="… CARICO LOOP";
+  try{
+    const response=await fetch("/api/radar/loop?minutes=60",{cache:"no-store"});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();
+    if(!Array.isArray(data.frames)||data.frames.length<2)throw new Error("Loop radar non valido");
+    radarFrames=data.frames;radarFrameIndex=0;radarVisible=true;
+    radarButton.classList.add("active");radarButton.textContent="◉ RADAR LIVE";
+    advanceRadarLoop();
+    radarLoopTimer=setInterval(advanceRadarLoop,850);
+    radarLoopButton.classList.add("active");radarLoopButton.textContent="■ FERMA LOOP";
+  }catch(error){
+    document.getElementById("radar-status").textContent="RADAR: loop non disponibile";
+    radarLoopButton.textContent="↻ LOOP 60'";
+  }finally{radarLoopButton.disabled=false;}
+});
+document.getElementById("refresh").addEventListener("click",()=>{load();loadRadar();});
+const cityEl=document.getElementById("city");
+CITIES.forEach(([name,lon,lat],index)=>{
+  const option=document.createElement("option");
+  option.value=index;option.textContent=name.replace("■ ","");cityEl.append(option);
+});
+cityEl.addEventListener("change",()=>{
+  if(cityEl.value!==""){
+    const [,lon,lat]=CITIES[Number(cityEl.value)];
+    selectClosestCell(lat,lon);
+  }
+});
+
+function tick(){
+  if(!times.length)return;
+  const t=times[tIdx];
+  const dd=t.slice(8,10)+"/"+t.slice(5,7),hh=t.slice(11,16);
+  const gg=["dom","lun","mar","mer","gio","ven","sab"][new Date(t).getDay()];
+  document.getElementById("clock").textContent=`${gg} ${dd}  ${hh}  [${tIdx + 1}/${times.length}]`;
+  updatePanel();drawHodo();updateRegionalSummary();
+}
+let last=0;
+function loop(ts){
+  ts=ts||0;
+  if(playing && ts-last>650){tIdx=(tIdx+1)%times.length;timeEl.value=tIdx;tick();last=ts;}
+  draw(ts);requestAnimationFrame(loop);
+}
+
+async function loadRadar(){
+  const status=document.getElementById("radar-status");
+  try{
+    const response=await fetch("/api/radar/latest",{cache:"no-store"});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();
+    if(!Array.isArray(data.values)||!Array.isArray(data.latitudes)||!Array.isArray(data.longitudes))
+      throw new Error("Risposta radar non valida");
+    radarData=data;
+    status.textContent=`RADAR METEOHUB · ${data.timestamp.replace("T"," ")}`;
+    updatePanel();
+  }catch(error){
+    radarData=null;
+    status.textContent="RADAR: avvia il bridge locale";
+    radarButton.classList.remove("active");
+  }
+}
+function advanceRadarLoop(){
+  radarData=radarFrames[radarFrameIndex];
+  document.getElementById("radar-status").textContent=
+    `RADAR METEOHUB · LOOP · ${radarData.timestamp.replace("T"," ")}`;
+  updatePanel();
+  radarFrameIndex=(radarFrameIndex+1)%radarFrames.length;
+}
+function stopRadarLoop(){
+  clearInterval(radarLoopTimer);radarLoopTimer=null;
+  radarLoopButton.classList.remove("active");radarLoopButton.textContent="↻ LOOP 60'";
+  loadRadar();
+}
+
+function settore(lat,lon){
+  if(lat>=46.25)return lon<13.35?"Carnia e settore alpino occidentale":"Tarvisiano e settore alpino orientale";
+  if(lat<45.86)return lon<13.35?"Bassa Friulana, laguna e costa":"Goriziano, Carso e Triestino";
+  if(lon<12.85)return "Pordenonese e pedemontana";
+  if(lon<13.35)return "Udinese e alta pianura friulana";
+  return "Goriziano e Carso";
+}
+function formatTime(value){
+  const date=new Date(value);
+  return `${["dom","lun","mar","mer","gio","ven","sab"][date.getDay()]} ${value.slice(8,10)}/${value.slice(5,7)} ${value.slice(11,16)}`;
+}
+function radarSituation(){
+  if(!radarData)return "Radar METEOHUB non disponibile.";
+  let peak={rate:-1,lat:0,lon:0};
+  radarData.values.forEach((row,y)=>row.forEach((rate,x)=>{
+    if(rate>peak.rate)peak={rate,lat:radarData.latitudes[y][x],lon:radarData.longitudes[y][x]};
+  }));
+  if(peak.rate<0.2)return `Radar METEOHUB ${radarData.timestamp.replace("T"," ")}: nessuna precipitazione significativa rilevata sul FVG.`;
+  return `Radar METEOHUB ${radarData.timestamp.replace("T"," ")}: precipitazioni in atto, picco ${peak.rate.toFixed(1)} mm/h vicino a ${nearestCity(peak.lat,peak.lon)[0].replace("■ ","")}.`;
+}
+function buildBulletin(){
+  if(!cells.length)return "Dati di previsione non disponibili.";
+  const start=times.findIndex(t=>new Date(t)>=new Date());
+  const first=start===-1?0:start, last=Math.min(times.length,first+48), per=[];
+  cells.forEach(cell=>{
+    let maximum={lv:0,cape:0,sh6:0,i:first};
+    for(let i=first;i<last;i++){
+      const cape=cell.h.cape[i]||0,sh6=shear(cell.h,i,"500hPa"),lv=level(cape,sh6);
+      if(lv>maximum.lv||(lv===maximum.lv&&cape>maximum.cape))maximum={lv,cape,sh6,i};
+    }
+    per.push({zone:settore(cell.lat,cell.lon),...maximum});
+  });
+  const zones=new Map();
+  per.forEach(item=>{
+    const prior=zones.get(item.zone);
+    if(!prior||item.lv>prior.lv||(item.lv===prior.lv&&item.cape>prior.cape))zones.set(item.zone,item);
+  });
+  const regional=[...zones.values()].reduce((worst,item)=>item.lv>worst.lv||(item.lv===worst.lv&&item.cape>worst.cape)?item:worst);
+  const now=new Date().toLocaleString("it-IT",{dateStyle:"short",timeStyle:"short"});
+  const risk=[
+    "nessun segnale convettivo rilevante",
+    "possibili rovesci o temporali isolati, localmente intensi",
+    "possibili temporali organizzati con rovesci intensi, grandine e raffiche localmente forti",
+    "ambiente potenzialmente favorevole a temporali forti o organizzati; grandine e raffiche intense non sono escluse"
+  ];
+  let out=`STORM-SHIFT · BOLLETTINO CONVETTIVO FVG\nEmesso: ${now} · validità: ${formatTime(times[first])} — ${formatTime(times[last-1])}\n`+"─".repeat(58)+"\n";
+  out+=`SITUAZIONE ATTUALE\n${radarSituation()}\n\n`;
+  out+=`TENDENZA 48 ORE\nA scala regionale: ${risk[regional.lv]}. `;
+  out+=regional.lv?`Finestra più favorevole: ${formatTime(times[regional.i])}.`:"";
+  out+="\n";
+  const active=[...zones.entries()].filter(([,item])=>item.lv>0).sort((a,b)=>b[1].lv-a[1].lv);
+  if(active.length){
+    out+="\nZONE DA SEGUIRE\n";
+    active.forEach(([zone,item])=>{
+      out+=`\n■ ${zone.toUpperCase()} · L${item.lv}\n`;
+      out+=`${risk[item.lv]}. Massimo previsto attorno a ${formatTime(times[item.i])} `;
+      out+=`(CAPE ${item.cape.toFixed(0)} J/kg; shear 0-6 km ${item.sh6.toFixed(0)} m/s).\n`;
+    });
+  }else out+="\nNessuna zona mostra al momento parametri favorevoli a temporali significativi nelle prossime 48 ore.\n";
+  out+="\n"+"─".repeat(58)+"\n";
+  out+="Fonti: previsione ICON seamless / Open-Meteo; precipitazione osservata: radar METEOHUB.\n";
+  out+="Valutazione sperimentale: consulta sempre le allerte ufficiali della Protezione Civile.\n";
+  return out;
+}
+function speakBulletin(txt){
+  if(!window.speechSynthesis) return;
+  let clean=txt.replace(/─+/g," ").replace(/[■·≥]/g," ")
+    .replace(/STORM-SHIFT.*?\n/,"Bollettino convettivo Friuli Venezia Giulia. ")
+    .replace(/CAPE/g,"c a p e").replace(/J\/kg/g,"joule per chilo")
+    .replace(/m\/s/g,"metri al secondo");
+  const u=new SpeechSynthesisUtterance(clean);
+  u.lang="it-IT"; u.rate=0.98;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+const bmodal=document.getElementById("bull"),btext=document.getElementById("btext");
+document.getElementById("bullbtn").addEventListener("click",()=>{
+  btext.textContent=buildBulletin(); bmodal.style.display="flex"; });
+document.getElementById("b-close").addEventListener("click",()=>{
+  bmodal.style.display="none"; if(window.speechSynthesis) speechSynthesis.cancel(); });
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){bmodal.style.display="none"; if(window.speechSynthesis)speechSynthesis.cancel();}
+  if((e.key===" " || e.key==="ArrowRight" || e.key==="ArrowLeft") && e.target.tagName!=="INPUT" && e.target.tagName!=="SELECT"){
+    e.preventDefault();
+    if(e.key===" "){document.getElementById("play").click();return;}
+    tIdx=Math.max(0,Math.min(times.length-1,tIdx+(e.key==="ArrowRight"?1:-1)));
+    timeEl.value=tIdx;tick();
+  }
+});
+document.getElementById("b-copy").addEventListener("click",()=>{
+  if(navigator.clipboard) navigator.clipboard.writeText(btext.textContent); });
+document.getElementById("b-speak").addEventListener("click",()=>speakBulletin(btext.textContent));
+
+resize();load().then(()=>{ 
+  if(cells.length){ 
+    sel=cells.find(c=>Math.abs(c.lat-46.13)<.05 && Math.abs(c.lon-13.02)<.05) || cells[0]; 
+    cityEl.value=CITIES.findIndex(city=>city[0].includes("Rodeano"));
+  } 
+  tick(); 
+  loadRadar();
+});
+setInterval(loadRadar,300000);
+setInterval(()=>{ if(!document.getElementById("refresh").disabled) load(); },1800000);
+</script>
+</body>
+</html>
