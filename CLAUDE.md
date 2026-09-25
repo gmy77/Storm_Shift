@@ -46,27 +46,41 @@ Conseguenze sul PC (modo 2):
 
 Prima di ogni commit va controllato che `git grep` non trovi email o chiavi.
 
-## Deploy (Cloudflare)
-Si fa dal PC, con **Docker Desktop acceso**: wrangler costruisce l'immagine in
-locale, anche per `--dry-run`.
-```
-npm ci
-npx wrangler secret put METEOHUB_EMAIL            # solo la prima volta
-npx wrangler secret put METEOHUB_ARCO_ACCESS_KEY  # solo la prima volta
-npx wrangler deploy
-```
-Il Worker `stormshift` esiste già su Cloudflare (deploy del 2026-09-06, da un
-sorgente che non è mai arrivato nel repo). `src/index.js` lo ricostruisce dal
-codice in produzione. Al primo deploy da qui ci sono tre punti da controllare:
-- **tag della migrazione** Durable Object (`v1` in `wrangler.jsonc`): se non
-  coincide con quello già applicato, wrangler si ferma con un errore, senza
-  danni. In quel caso si usa il tag che indica l'errore.
-- **`instance_type` del container**: in `wrangler.jsonc` non è indicato, quindi
-  vale quello predefinito. Va confrontato con la dashboard
-  (Workers > stormshift > Containers).
-- **dominio**: `stormshift.gimmycloud.net` oggi può puntare al Tunnel del PC.
-  Per servirlo dal Worker bisogna prima togliere il record DNS del tunnel e poi
-  aggiungere il custom domain al Worker. Da fare solo con l'ok di Gimmy.
+## Deploy (Cloudflare): automatico con Workers Builds
+Dal 2026-09-25 il Worker `stormshift` è collegato a questo repo con **Workers
+Builds**: Cloudflare → Workers & Pages → stormshift → Impostazioni → Crea.
+- **Ogni push su `main` va online da solo.** Cloudflare costruisce sui suoi
+  server sia il Worker sia l'immagine del container dal `Dockerfile`: non
+  servono Docker né comandi sul PC. Per questo su `main` si fa merge solo di
+  modifiche già provate.
+- Impostazioni: comando di generazione vuoto, comando di distribuzione
+  `npx wrangler deploy`, directory radice `/`, branch `main`.
+- Il token API scelto nel collegamento era il "build token" di
+  `astro-blog-starter-template`. Se la build fallisce per permessi
+  (container, D1), va creato un token nuovo dallo stesso menu.
+- I segreti `METEOHUB_EMAIL` e `METEOHUB_ARCO_ACCESS_KEY` stanno nel Worker
+  (Impostazioni → Variabili e segreti). I deploy non li toccano.
+- **La chiave ARCO scade.** Il 2026-09-25 era scaduta e Gimmy l'ha rigenerata
+  su MeteoHub. Se il radar risponde "Archivio ARCO non disponibile" per ore,
+  la prima cosa da controllare è la validità della chiave su MeteoHub.
+
+Lezione del 2026-09-25: `npx wrangler deploy --containers-rollout=none`
+(l'unico possibile dal PC senza Docker) aveva messo online il Worker lasciando
+il Durable Object **senza container**. Nella diagnostica compariva
+`container_error: "There is no container application assigned to this Durable
+Object namespace"`. Serve sempre un deploy completo, e adesso lo fa Workers
+Builds.
+
+Deploy a mano, solo se Workers Builds non è disponibile: dal PC con Docker
+Desktop acceso, `npm ci` e poi `npx wrangler deploy`.
+
+## Dominio pubblico
+`stormshift.gimmycloud.net` **non è collegato al Worker**: nei "Domini
+personalizzati" il 2026-09-25 non c'era niente, quindi arriva al PC tramite
+Cloudflare Tunnel (modo 2). La versione Cloudflare risponde su
+`https://stormshift.gimmy077.workers.dev`. Per spostare il dominio sul Worker
+bisogna togliere il record DNS del tunnel e aggiungere il dominio personalizzato
+al Worker, solo con l'ok di Gimmy.
 
 ## Diagnostica (per la sentinella di sismo-echo)
 Il Worker scrive nella stessa tabella `diagnostica` di sismo-fvg: database D1
