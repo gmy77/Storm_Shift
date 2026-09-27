@@ -33,6 +33,17 @@ quando si chiude qualcosa di importante.
      puntare a `C:\Users\gimmy\repos\Storm_Shift\Start-StormShift.ps1` (corretto
      il 2026-09-27: puntava ancora a `OneDrive\Desktop`, quindi resuscitava la
      copia vecchia ogni 5 minuti anche dopo averla fermata a mano).
+   - **Due processi `python.exe stormshift_meteohub_server.py` per una sola
+     istanza sono normali**, non un doppione da pulire: con `satpy-env` il
+     `python.exe` lanciato da `Start-Process` e' un guscio che ne avvia uno
+     figlio reale (poca memoria/CPU sul primo, quello vero sul secondo).
+     Uccidere quello leggero fa cadere anche il figlio. I doppioni veri da
+     eliminare sono solo quelli con `OneDrive\Desktop` nel path invece di
+     `repos\Storm_Shift` (residui del Watchdog vecchio, vedi sopra). Se il sito
+     risponde 502 con il bridge locale sano (`/api/health` OK su
+     `127.0.0.1:8765`), il problema e' il tunnel: killare il processo
+     `cloudflared` e rilanciare `Start-StormShift.ps1` lo fa riconnettere
+     (10-15s).
 
    Funziona solo a PC acceso.
 
