@@ -48,13 +48,30 @@ if (-not (Test-LocalPort -Port 8765)) {
     Write-Host "Bridge METEOHUB gia' attivo." -ForegroundColor DarkGreen
 }
 
-$tunnelActive = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like "*stormshift.yml*" }
-if (-not $tunnelActive) {
-    Start-Process -FilePath $cloudflared -ArgumentList "--config `"$tunnelConfig`" tunnel run" -WindowStyle Hidden
-    Write-Host "Cloudflare Tunnel avviato." -ForegroundColor Green
-} else {
-    Write-Host "Cloudflare Tunnel gia' attivo." -ForegroundColor DarkGreen
+# Un mutex di sistema evita che due lanci quasi in contemporanea (avvio a
+# mano + Watchdog ogni 5 minuti) vedano entrambi "nessun tunnel" e ne
+# aprano due. Se un'altra istanza lo tiene gia' occupato (sta controllando
+# o avviando proprio ora), questa non tocca nulla: se serve davvero un
+# avvio, ci pensera' il prossimo giro del Watchdog fra 5 minuti.
+$tunnelMutex = New-Object System.Threading.Mutex($false, "Global\StormShiftTunnelStart")
+$acquiredMutex = $false
+try {
+    $acquiredMutex = $tunnelMutex.WaitOne(3000)
+    if (-not $acquiredMutex) {
+        Write-Host "Un'altra istanza sta gia' controllando il tunnel: non tocco nulla." -ForegroundColor DarkYellow
+    } else {
+        $tunnelActive = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -like "*stormshift.yml*" }
+        if (-not $tunnelActive) {
+            Start-Process -FilePath $cloudflared -ArgumentList "--config `"$tunnelConfig`" tunnel run" -WindowStyle Hidden
+            Write-Host "Cloudflare Tunnel avviato." -ForegroundColor Green
+        } else {
+            Write-Host "Cloudflare Tunnel gia' attivo." -ForegroundColor DarkGreen
+        }
+    }
+} finally {
+    if ($acquiredMutex) { $tunnelMutex.ReleaseMutex() }
+    $tunnelMutex.Dispose()
 }
 
 for ($attempt = 1; $attempt -le 12; $attempt++) {
