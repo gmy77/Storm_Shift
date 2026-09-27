@@ -26,6 +26,13 @@ quando si chiude qualcosa di importante.
      su `stormshift.gimmycloud.net`;
    - le credenziali stanno nel Windows Credential Manager
      (`stormshift_meteohub_secrets.py`).
+   - Un'operazione pianificata di Windows, **"StormShift Watchdog"** (esiste
+     dal 06/09, gira ogni 5 minuti tramite
+     `C:\Users\gimmy\Scripts\StormShiftWatchdog.vbs`), rilancia
+     `Start-StormShift.ps1` da sola se il bridge non risponde. Il `.vbs` deve
+     puntare a `C:\Users\gimmy\repos\Storm_Shift\Start-StormShift.ps1` (corretto
+     il 2026-09-27: puntava ancora a `OneDrive\Desktop`, quindi resuscitava la
+     copia vecchia ogni 5 minuti anche dopo averla fermata a mano).
 
    Funziona solo a PC acceso.
 
@@ -134,6 +141,55 @@ Gimmy li ha scaricati dalla produzione e sono stati confrontati:
 Gli unici file statici noti della produzione erano `/` e `/metagram.html`. Se
 dopo il deploy manca qualcos'altro, si torna al Worker vecchio da Cloudflare
 (Workers > stormshift > Deployments > Rollback).
+
+## Diagnosi 2026-09-27: perche' entrambi i modi non rispondevano
+Gimmy ha aperto `stormshift.gimmy077.workers.dev`, ha visto "avvia il bridge
+locale" e ha provato a "riattivarlo": ha finito per scoprire che nessuno dei
+due modi funzionava, per due cause completamente diverse e scollegate.
+
+**Modo 1 (Cloudflare Container): non e' un problema di permessi del token.**
+La "lezione del 2026-09-25" sopra ipotizzava un token senza gli scope giusti.
+Chiamando direttamente `GET /accounts/{account_id}/containers/me` con l'API
+Cloudflare (non il build token, il token dell'account) la risposta e'
+inequivocabile:
+```
+"Unauthorized: You do not have access to Cloudflare Containers.
+Deploying containers requires the Workers Paid plan."
+```
+L'account Cloudflare (`GG_IT`) non ha il piano Workers Paid (5$/mese): senza
+quello, `wrangler deploy` costruisce e carica il Worker e l'immagine ma la
+chiamata finale che registra il Container fallisce sempre, lasciando il
+Durable Object senza container assegnato. Finche' non si attiva quel piano
+(scelta di Gimmy, mai da fare in automatico), il modo 1 **non puo' funzionare**,
+indipendentemente da token o build. Il messaggio "There is no container
+application assigned..." nella diagnostica ha sempre questa causa, non i
+permessi del build token.
+
+**Modo 2 (PC + Tunnel): due bug distinti, non la scadenza della chiave.**
+Il bridge sembrava rotto per chiave ARCO scaduta, ma la chiave era gia' stata
+rigenerata da Gimmy. Il problema vero:
+- Le credenziali nel Credential Manager erano salvate con un nome vecchio
+  (`StormShift.MeteoHub.ARCO.Email` / `...AccessKey`, con i punti) diverso da
+  quello che `stormshift_meteohub_secrets.py` cerca oggi (`StormShift/METEOHUB_EMAIL`
+  / `...ACCESS_KEY`, con lo slash): risalgono a prima della "lezione" sui
+  segreti del 2026-09-25 e non erano mai state riscritte con i nomi nuovi.
+- `set-from-clipboard` legge la clipboard **subito dopo** che si scrive
+  l'email, non dopo: la chiave va copiata **prima** di lanciare il comando, e
+  l'email va scritta a tastiera (mai incollata), altrimenti si sovrascrive la
+  clipboard con l'email e si salva quella al posto della chiave (successo
+  quasi silenzioso: il comando dice comunque "salvate"). Un primo tentativo con
+  `set` e incolla nel prompt mascherato (`getpass`, che non mostra mai nulla,
+  nemmeno asterischi: e' normale) aveva prodotto una chiave da 129 caratteri
+  invece di ~43, sempre per un incolla andato male, non per il comando in se'.
+- Il Watchdog (vedi sopra) rilanciava la copia vecchia in `OneDrive\Desktop`
+  ogni 5 minuti, che punta comunque ai nomi vecchi delle credenziali: per
+  questo il processo "tornava rotto" anche dopo aver sistemato tutto nel repo.
+
+Verifica pratica di una chiave ARCO, senza mai stampare il valore: leggerla dal
+vault con `CredReadW` e fare una richiesta diretta con `Authorization: Basic`
+a `https://meteohub.agenziaitaliameteo.it/api/arco/radar.zarr/.zmetadata` — un
+`401 Invalid access key` e' inequivocabile, a differenza del messaggio generico
+"Archivio ARCO non disponibile" che il server restituisce per qualsiasi errore.
 
 ## Mancano nel repo (erano citati nel README ma non erano nello zip)
 `stormshift_forecast.py`, `calibra_1..4_*.py` e `LICENSE`. Vanno aggiunti dal PC.
