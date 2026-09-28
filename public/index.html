@@ -477,8 +477,9 @@ function updateRegionalSummary(){
   const label=["nessun segnale significativo","attenzione ordinaria","criticità elevata","scenario severo"][peak.level];
   const time=times[peak.index].slice(8,10)+"/"+times[peak.index].slice(5,7)+" "+times[peak.index].slice(11,16);
   const place=nearestCity(peak.cell.lat,peak.cell.lon)[0].replace("■ ","");
-  document.getElementById("c-regional").textContent=
-    `PROSSIME 24H: ${label.toUpperCase()} · picco vicino a ${place}, ${time}.`;
+  document.getElementById("c-regional").textContent=peak.level<1
+    ? `PROSSIME 24H: ${label.toUpperCase()}.`
+    : `PROSSIME 24H: ${label.toUpperCase()} · picco vicino a ${place}, ${time}.`;
 }
 
 function selectClosestCell(lat,lon){
